@@ -1,15 +1,12 @@
 import os
 import slack
 import requests
-import dateparser
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 OAUTH_TOKEN = os.environ["OAUTH_TOKEN"]
 EDSTEM_TOKEN = os.environ["EDSTEM_TOKEN"]
 PEOPLE_URL = os.environ["PEOPLE_URL"]
 INTERACTS_URL = os.environ["INTERACTS_URL"]
-TIME_ZONE = ZoneInfo(os.environ["TIME_ZONE"])
 CHAT_NAME = os.environ["CHAT_NAME"]
 PROF_STICKER = os.environ["PROF_STICKER"]
 
@@ -37,9 +34,10 @@ def get_replies_from_week(interacts, today, admins):
   last_week = today - timedelta(days=7)
 
   for reply in interacts["replies"]:
-    date = dateparser.parse(reply["created_at"])
+    date = datetime.strptime(reply["created_at"][:10], "%Y-%m-%d").date()
+    date -= timedelta(days=1)  # Edstem uses weird timezone
     replier = reply["user_id"]
-    if last_week <= date <= today and replier in admins:
+    if last_week <= date and replier in admins:
       res[replier] = res.get(replier, 0) + 1
   
   return res
@@ -61,7 +59,7 @@ def main(event, context):
   if interacts.status_code != 200:
     raise RuntimeError("error fetching people: " + interacts.text)
 
-  replies = get_replies_from_week(interacts.json(), datetime.now().astimezone(TIME_ZONE), admins)
+  replies = get_replies_from_week(interacts.json(), datetime.today().date(), admins)
 
   top_reply_count = max(replies.values())
   top_repliers = [admins[r] for r in replies if replies[r] == top_reply_count]
