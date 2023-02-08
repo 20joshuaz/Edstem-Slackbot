@@ -15,6 +15,10 @@ SHOUTOUT_TEMPLATE = """
 
 For last week:
 :speech_balloon: %s replied to %d posts!
+:heart: %s got %d hearts!
+:eyes: %s viewed %d posts!
+
+Onto next week! :rocket:
 """
 
 def post_message(channel, msg):
@@ -29,22 +33,45 @@ def get_edstem_admins(people):
 
   return res
 
-def get_replies_from_week(interacts, today, admins):
+def get_stats_from_week(interacts, admins, field):
   res = {}
-  last_week = today - timedelta(days=7)
+  last_week = datetime.today().date() - timedelta(days=7)
 
-  for reply in interacts["replies"]:
-    date = datetime.strptime(reply["created_at"][:10], "%Y-%m-%d").date()
-    date -= timedelta(days=1)  # Edstem uses weird timezone
-    replier = reply["user_id"]
-    if last_week <= date and replier in admins:
-      res[replier] = res.get(replier, 0) + 1
+  def get_edstem_date(date):
+    return datetime.strptime(date[:10], "%Y-%m-%d").date()
+
+  for entry in interacts[field]:
+    date = get_edstem_date(entry["created_at"])
+    doer = entry["user_id"]
+    if last_week <= date and doer in admins:
+      res[doer] = res.get(doer, 0) + entry.get("counts", 1)
   
   return res
 
-def get_message(top, n):
-  mentions = ["<@%s>" % name for name in top]
-  return SHOUTOUT_TEMPLATE % (PROF_STICKER, PROF_STICKER, ", ".join(mentions), n)
+def get_leaders(admins, action):
+  top_count = max(action.values())
+  top_doers = [admins[r] for r in action if action[r] == top_count]
+  return top_count, top_doers
+
+def get_message(top_repliers, top_hearted, top_viewers):
+  def get_mentions(names):
+    mentions = ["<@%s>" % name for name in names]
+    return ", ".join(mentions)
+
+  reply_mentions = get_mentions(top_repliers[1])
+  heart_mentions = get_mentions(top_hearted[1])
+  view_mentions = get_mentions(top_viewers[1])
+
+  return SHOUTOUT_TEMPLATE % (
+    PROF_STICKER, 
+    PROF_STICKER, 
+    reply_mentions, 
+    top_repliers[0],
+    heart_mentions,
+    top_hearted[0],
+    view_mentions,
+    top_viewers[0]
+  )
 
 def main(event, context):
   header = {"X-Token": EDSTEM_TOKEN}
@@ -59,12 +86,17 @@ def main(event, context):
   if interacts.status_code != 200:
     raise RuntimeError("error fetching people: " + interacts.text)
 
-  replies = get_replies_from_week(interacts.json(), datetime.today().date(), admins)
+  interacts_json = interacts.json()
+  replies = get_stats_from_week(interacts_json, admins, "replies")
+  hearts = get_stats_from_week(interacts_json, admins, "hearts")
+  views = get_stats_from_week(interacts_json, admins, "views")
 
-  top_reply_count = max(replies.values())
-  top_repliers = [admins[r] for r in replies if replies[r] == top_reply_count]
+  top_repliers = get_leaders(admins, replies)
+  top_hearted = get_leaders(admins, hearts)
+  top_viewers = get_leaders(admins, views)
 
-  post_message(CHAT_NAME, get_message(top_repliers, top_reply_count))
+  message = get_message(top_repliers, top_hearted, top_viewers)
+  post_message(CHAT_NAME, message)
 
 if __name__ == "__main__":
   main(None, None)
