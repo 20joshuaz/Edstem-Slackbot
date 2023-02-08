@@ -11,6 +11,14 @@ PEOPLE_URL = os.environ["PEOPLE_URL"]
 INTERACTS_URL = os.environ["INTERACTS_URL"]
 TIME_ZONE = ZoneInfo(os.environ["TIME_ZONE"])
 CHAT_NAME = os.environ["CHAT_NAME"]
+PROF_STICKER = os.environ["PROF_STICKER"]
+
+SHOUTOUT_TEMPLATE = """
+%s :tada: *Edstem Shoutouts* %s :tada:
+
+For last week:
+:speech_balloon: %s replied to %d posts!
+"""
 
 def post_message(channel, msg):
   client = slack.WebClient(token=OAUTH_TOKEN)
@@ -38,20 +46,20 @@ def get_replies_from_week(interacts, today, admins):
 
 def get_message(top, n):
   mentions = ["<@%s>" % name for name in top]
-  return "\N{Party Popper} Shoutout to %s for %d replies this week!" % (", ".join(mentions), n)
+  return SHOUTOUT_TEMPLATE % (PROF_STICKER, PROF_STICKER, ", ".join(mentions), n)
 
-def main():
+def main(event, context):
   header = {"X-Token": EDSTEM_TOKEN}
 
   people = requests.get(PEOPLE_URL, headers=header)
   if people.status_code != 200:
-    raise RuntimeError("error fetching people: " + str(people.text))
+    raise RuntimeError("error fetching people: " + people.text)
   
   admins = get_edstem_admins(people.json())
 
   interacts = requests.get(INTERACTS_URL, headers=header)
   if interacts.status_code != 200:
-    raise RuntimeError("error fetching people: " + str(interacts.text))
+    raise RuntimeError("error fetching people: " + interacts.text)
 
   replies = get_replies_from_week(interacts.json(), datetime.now().astimezone(TIME_ZONE), admins)
 
@@ -61,4 +69,4 @@ def main():
   post_message(CHAT_NAME, get_message(top_repliers, top_reply_count))
 
 if __name__ == "__main__":
-  main()
+  main(None, None)
