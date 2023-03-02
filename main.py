@@ -55,23 +55,26 @@ def get_leaders(admins, action):
 
 
 def get_message(top_repliers, top_hearted, top_viewers, prof_sticker):
-    def get_mentions(names):
-        mentions = ["<@%s>" % name for name in names]
-        return ", ".join(mentions)
+    def join_names(names):
+        return ", ".join(names)
 
-    reply_mentions = get_mentions(top_repliers[1])
-    heart_mentions = get_mentions(top_hearted[1])
-    view_mentions = get_mentions(top_viewers[1])
+    reply_count, reply_names = top_repliers
+    heart_count, heart_names = top_hearted
+    view_count, view_names = top_viewers
+
+    reply_names = join_names(reply_names)
+    heart_names = join_names(heart_names)
+    view_names = join_names(view_names)
 
     return SHOUTOUT_TEMPLATE % (
         prof_sticker,
         prof_sticker,
-        reply_mentions,
-        top_repliers[0],
-        heart_mentions,
-        top_hearted[0],
-        view_mentions,
-        top_viewers[0]
+        reply_names,
+        reply_count,
+        heart_names,
+        heart_count,
+        view_names,
+        view_count,
     )
 
 
